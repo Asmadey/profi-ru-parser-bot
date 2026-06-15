@@ -4,13 +4,43 @@ from typing import Any
 import re
 
 
-BOT_WORD_PATTERNS = (
+TARGET_KEYWORD_PATTERNS = (
     re.compile(r"(?iu)\bбот\b"),
     re.compile(r"(?iu)\bбота\b"),
     re.compile(r"(?iu)\bботы\b"),
     re.compile(r"(?iu)\bботов\b"),
+    re.compile(r"(?iu)\bботом\b"),
+    re.compile(r"(?iu)\bботу\b"),
     re.compile(r"(?iu)\bчат[- ]?бот\b"),
+    re.compile(r"(?iu)\bчат[- ]?бота\b"),
+    re.compile(r"(?iu)\bchat[- ]?bot\b"),
     re.compile(r"(?iu)\bbot\b"),
+    re.compile(r"(?iu)\bbots\b"),
+
+    re.compile(r"(?iu)\bcrm\b"),
+    re.compile(r"(?iu)\bcrm[- ]?систем\w*\b"),
+    re.compile(r"(?iu)\bцрм\b"),
+    re.compile(r"(?iu)\bцрм[- ]?систем\w*\b"),
+    re.compile(r"(?iu)\bсрм\b"),
+    re.compile(r"(?iu)\bсрм[- ]?систем\w*\b"),
+    re.compile(r"(?iu)\bси[- ]?ар[- ]?эм\b"),
+
+    re.compile(r"(?iu)\bпарсер\w*\b"),
+    re.compile(r"(?iu)\bпарсинг\w*\b"),
+    re.compile(r"(?iu)\bпарсить\b"),
+    re.compile(r"(?iu)\bпарсить\w*\b"),
+    re.compile(r"(?iu)\bспарс\w*\b"),
+    re.compile(r"(?iu)\bраспарс\w*\b"),
+    re.compile(r"(?iu)\bparser\w*\b"),
+    re.compile(r"(?iu)\bparsing\b"),
+    re.compile(r"(?iu)\bparse\b"),
+
+    re.compile(r"(?iu)\bавтоматизац\w*\b"),
+    re.compile(r"(?iu)\bавтоматизир\w*\b"),
+    re.compile(r"(?iu)\bавтоматическ\w*\b"),
+    re.compile(r"(?iu)\bautomation\b"),
+    re.compile(r"(?iu)\bautomate\b"),
+    re.compile(r"(?iu)\bautomated\b"),
 )
 
 DEV_KEYWORDS = (
@@ -22,20 +52,30 @@ DEV_KEYWORDS = (
     "сделать",
     "написать",
     "реализовать",
+    "доработать",
+    "настроить",
+    "настройка",
+    "внедрить",
+    "внедрение",
+    "интегрировать",
+    "интеграция",
     "нужен",
+    "нужна",
+    "нужно",
+    "нужны",
     "требуется",
+    "требуются",
+    "необходимо",
+    "надо",
+    "ищу",
+    "заказать",
+    "хочу",
 )
 
 DISALLOWED_TOPICS = (
     "таргет",
     "таргетинг",
     "таргетированная реклама",
-    "реклама",
-    "маркетинг",
-    "маркетолог",
-    "лидогенерация",
-    "лиды",
-    "трафик",
     "контекстная реклама",
     "директ",
     "smm",
@@ -110,8 +150,8 @@ def _normalize_text(text: str) -> str:
     return " ".join(text.split())
 
 
-def _contains_bot_word(text: str) -> bool:
-    for rx in BOT_WORD_PATTERNS:
+def _contains_target_keyword(text: str) -> bool:
+    for rx in TARGET_KEYWORD_PATTERNS:
         if rx.search(text):
             return True
     return False
@@ -167,7 +207,7 @@ def order_matches_filter(data: Any) -> bool:
     if not text:
         return False
 
-    if not _contains_bot_word(text):
+    if not _contains_target_keyword(text):
         return False
 
     if not _contains_dev_intent(text):
