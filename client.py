@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+import urllib.request
 from datetime import datetime
 
 from playwright.sync_api import TimeoutError as PWTimeoutError
@@ -7,6 +9,22 @@ from playwright.sync_api import Error as PlaywrightError
 
 
 logger = logging.getLogger("parser.client")
+
+
+def _get_browser_ws(cdp_url: str) -> str:
+    """Fetch the webSocketDebuggerUrl from a Chrome CDP endpoint.
+
+    The CDP endpoint (e.g. http://127.0.0.1:9225/json/version) returns JSON
+    containing 'webSocketDebuggerUrl'. Playwright's connect_over_cdp needs
+    this ws:// URL when connecting to an already-running Chrome instance.
+    """
+    resp = urllib.request.urlopen(cdp_url, timeout=10)
+    data = json.loads(resp.read().decode("utf-8"))
+    ws_url = data.get("webSocketDebuggerUrl")
+    if not ws_url:
+        raise RuntimeError(f"No webSocketDebuggerUrl in CDP response from {cdp_url}")
+    logger.info("CDP websocket: %s", ws_url)
+    return ws_url
 
 
 class ProfiClient:

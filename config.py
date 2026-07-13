@@ -10,6 +10,7 @@ class Settings:
     out_jsonl_path: str = "new_orders.jsonl"
 
     headless: bool = False
+    cdp_url: str = "http://127.0.0.1:9225/json/version"
     selector_timeout_ms: int = 60_000
     card_selector: str = 'a[data-testid$="_order-snippet"]'
 
