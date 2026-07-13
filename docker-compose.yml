@@ -1,0 +1,43 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────
+# Profi.ru Parser Bot — Docker Compose
+#
+# Two services:
+#   chrome  — headless Chrome with CDP debugging exposed on port 9225
+#   bot     — the Python parser/Telegram bot that connects to Chrome
+#
+# IMPORTANT — CDP_URL override:
+#   config.py defaults to:
+#     cdp_url = 'http://127.0.0.1:9225/json/version'
+#   When running under Docker Compose the bot container cannot reach
+#   Chrome at 127.0.0.1 (that is the bot's own loopback).  It must
+#   connect to the `chrome` service instead.  Set CDP_URL in your
+#   `.env` file (or directly below) so that config.py picks it up:
+#
+#     CDP_URL=http://chrome:9225/json/version
+#
+#   The .env referenced by `env_file: .env` should contain this
+#   variable alongside BOT_TOKEN, ADMIN_CHAT_ID, TELEGRAM_PROXY, etc.
+# ──────────────────────────────────────────────────────────────
+
+services:
+  chrome:
+    image: chromedp/headless-shell:latest
+    ports:
+      - "9225:9225"
+    command:
+      - "--remote-debugging-port=9225"
+      - "--remote-debugging-address=0.0.0.0"
+    shm_size: "2g"
+    restart: unless-stopped
+
+  bot:
+    build: .
+    depends_on:
+      - chrome
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - "./data:/app/data"
+      - "./logs:/app/logs"

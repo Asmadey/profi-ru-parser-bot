@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "profi-parser-bot"
+version = "0.1.0"
+description = "Telegram bot for monitoring Profi.ru AI/ML orders"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "playwright",
+    "aiogram",
+    "aiohttp",
+    "python-dotenv",
+    "beautifulsoup4",
+    "lxml",
+]
+
+[project.scripts]
+profi-bot = "run_all:main"
+
+[tool.setuptools]
+py-modules = ["run_all", "config", "tg_formatter", "logger_setup", "main"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]

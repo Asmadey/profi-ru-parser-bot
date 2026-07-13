@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import socket
+import time
 from pathlib import Path
 from asyncio.subprocess import Process
 
@@ -180,6 +181,11 @@ async def telegram_notifier(log):
                         offset = f.tell()
                         save_cursor(cursor_path, offset)
 
+                # Heartbeat — signal that the notifier loop is alive
+                Path('heartbeat.json').write_text(
+                    json.dumps({"timestamp": time.time(), "status": "alive"})
+                )
+
                 await asyncio.sleep(BOT_POLL_SEC)
 
             except asyncio.CancelledError:
@@ -231,7 +237,7 @@ async def supervise_parser(runlog):
         CURRENT_PARSER_PROC = None
 
 
-async def main():
+async def async_main():
     runlog = setup_logger("run_all")
     runlog.info("run_all started: parser + telegram in one process.")
 
@@ -277,8 +283,13 @@ async def main():
         runlog.info("Shutdown complete.")
 
 
-if __name__ == "__main__":
+def main():
+    """Sync entry point for console_scripts (profi-bot)."""
     try:
-        asyncio.run(main())
+        asyncio.run(async_main())
     except KeyboardInterrupt:
         pass
+
+
+if __name__ == "__main__":
+    main()

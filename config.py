@@ -20,3 +20,6 @@ class Settings:
     poll_jitter_sec: int = 25
     backoff_min_sec: int = 180
     backoff_max_sec: int = 900
+
+    # Filter settings
+    budget_min: int = 10_000

@@ -194,14 +194,14 @@ def _extract_budget_value(text: str) -> int | None:
     return None
 
 
-def _budget_matches(text: str) -> bool:
+def _budget_matches(text: str, budget_min: int = 10_000) -> bool:
     budget = _extract_budget_value(text)
     if budget is None:
         return True
-    return budget >= 10000
+    return budget >= budget_min
 
 
-def order_matches_filter(data: Any) -> bool:
+def order_matches_filter(data: Any, budget_min: int = 10_000) -> bool:
     text = _normalize_text(_to_text(data))
 
     if not text:
@@ -219,7 +219,7 @@ def order_matches_filter(data: Any) -> bool:
     if _contains_disallowed_platforms(text):
         return False
 
-    if not _budget_matches(text):
+    if not _budget_matches(text, budget_min):
         return False
 
     return True

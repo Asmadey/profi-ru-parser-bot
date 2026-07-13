@@ -1,0 +1,15 @@
+[Unit]
+Description=Profi.ru Parser Bot
+After=network-online.target
+
+[Service]
+Type=simple
+User=profi-bot
+WorkingDirectory=/opt/profi-parser-bot
+ExecStart=/opt/profi-parser-bot/.venv/bin/python run_all.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUTF8=1
+
+[Install]
+WantedBy=multi-user.target
