@@ -1,6 +1,5 @@
 import html
 import re
-from html import escape as h
 
 def h(x):
     return html.escape(str(x)) if x else ""

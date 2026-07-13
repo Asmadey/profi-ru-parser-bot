@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import json
+import socket
 from pathlib import Path
 from asyncio.subprocess import Process
 
@@ -28,7 +29,19 @@ BOT_POLL_SEC = 3
 RESTART_DELAY_SEC = 10
 MAX_RESTARTS = 50
 
+CDP_HOST = "127.0.0.1"
+CDP_PORT = 9225
+
 CURRENT_PARSER_PROC: Process | None = None
+
+
+def check_cdp_available() -> bool:
+    """Check if Chrome CDP endpoint is reachable before starting."""
+    try:
+        with socket.create_connection((CDP_HOST, CDP_PORT), timeout=5):
+            return True
+    except (ConnectionRefusedError, socket.timeout, OSError):
+        return False
 
 
 async def start_parser_process(log) -> Process:
@@ -221,6 +234,17 @@ async def supervise_parser(runlog):
 async def main():
     runlog = setup_logger("run_all")
     runlog.info("run_all started: parser + telegram in one process.")
+
+    # Validate Chrome CDP is reachable before starting
+    if not check_cdp_available():
+        runlog.error(
+            "Chrome CDP not reachable at %s:%s. "
+            "Start Chrome with --remote-debugging-port=9225 before running this bot.",
+            CDP_HOST, CDP_PORT,
+        )
+        sys.exit(1)
+
+    runlog.info("Chrome CDP OK at %s:%s", CDP_HOST, CDP_PORT)
 
     supervise_task = asyncio.create_task(supervise_parser(runlog))
     bot_task = asyncio.create_task(telegram_notifier(setup_logger("bot")))
