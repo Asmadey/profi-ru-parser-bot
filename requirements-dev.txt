@@ -1,0 +1,10 @@
+# Development & testing dependencies.
+# Install with:  pip install -r requirements-dev.txt
+# (this pulls in runtime deps from requirements.txt as well via `-r`).
+
+-r requirements.txt
+
+pytest==9.1.1
+pytest-asyncio==1.1.0
+pytest-cov==7.0.0
+ruff==0.15.10
