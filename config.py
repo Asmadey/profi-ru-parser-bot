@@ -23,3 +23,4 @@ class Settings:
 
     # Filter settings
     budget_min: int = 10_000
+    specialties_path: str = "specialties.yaml"

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
 import re
+
+if TYPE_CHECKING:
+    from specialties import Specialty
 
 
 TARGET_KEYWORD_PATTERNS = (
@@ -202,6 +205,17 @@ def _budget_matches(text: str, budget_min: int = 10_000) -> bool:
 
 
 def order_matches_filter(data: Any, budget_min: int = 10_000) -> bool:
+    """Backwards-compatible wrapper around :func:`order_matches_specialty`.
+
+    Uses :data:`specialties.DEFAULT_SPECIALTY` (which mirrors the original
+    hardcoded patterns) so existing callers see identical behaviour.
+
+    When *budget_min* differs from the default specialty's budget_min,
+    the override is applied directly to the budget check so the public
+    API remains unchanged.
+    """
+    from specialties import DEFAULT_SPECIALTY
+
     text = _normalize_text(_to_text(data))
 
     if not text:
@@ -223,3 +237,70 @@ def order_matches_filter(data: Any, budget_min: int = 10_000) -> bool:
         return False
 
     return True
+
+
+# ---------------------------------------------------------------------------
+# Specialty-aware filtering (multi-specialty support)
+# ---------------------------------------------------------------------------
+
+def _contains_target_keyword_for(text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
+    for rx in patterns:
+        if rx.search(text):
+            return True
+    return False
+
+
+def _contains_dev_intent_for(text: str, keywords: tuple[str, ...]) -> bool:
+    return any(keyword in text for keyword in keywords)
+
+
+def _contains_disallowed_topics_for(text: str, topics: tuple[str, ...]) -> bool:
+    return any(keyword in text for keyword in topics)
+
+
+def _contains_disallowed_platforms_for(text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
+    for rx in patterns:
+        if rx.search(text):
+            return True
+    return False
+
+
+def order_matches_specialty(data: Any, specialty: "Specialty") -> bool:
+    """Check whether *data* matches a single :class:`Specialty`.
+
+    Applies the same logic as :func:`order_matches_filter` but uses the
+    patterns and thresholds defined on *specialty* rather than the
+    module-level constants.
+    """
+    text = _normalize_text(_to_text(data))
+
+    if not text:
+        return False
+
+    if not _contains_target_keyword_for(text, specialty.target_keyword_patterns):
+        return False
+
+    if not _contains_dev_intent_for(text, specialty.dev_keywords):
+        return False
+
+    if _contains_disallowed_topics_for(text, specialty.disallowed_topics):
+        return False
+
+    if _contains_disallowed_platforms_for(text, specialty.disallowed_platform_patterns):
+        return False
+
+    if not _budget_matches(text, specialty.budget_min):
+        return False
+
+    return True
+
+
+def match_specialties(data: Any, specialties: list["Specialty"]) -> list["Specialty"]:
+    """Return all specialties from *specialties* that match *data*.
+
+    This enables multi-specialty routing: an order can match more than
+    one specialty (e.g. an order mentioning both ML and React would match
+    both the "AI/ML" and "Web Development" specialties), and the caller
+    can route notifications to each matched specialty's ``chat_id``.
+    """
+    return [spec for spec in specialties if order_matches_specialty(data, spec)]

@@ -8,11 +8,14 @@ from pathlib import Path
 from asyncio.subprocess import Process
 
 from dotenv import load_dotenv
-from aiogram import Bot
+from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramRetryAfter
+from aiogram.filters import Command
+from aiogram.types import BotCommand
 
+from bot_commands import commands_router, is_paused
 from config import Settings
 from tg_formatter import format_order
 from logger_setup import setup_logger
@@ -176,7 +179,11 @@ async def telegram_notifier(log):
                                 continue
 
                             text = format_order(order)
-                            await send_order_message(bot, log, text)
+
+                            if is_paused():
+                                log.info("Paused — skipping send for order %s", order.get("order_id", "?"))
+                            else:
+                                await send_order_message(bot, log, text)
 
                         offset = f.tell()
                         save_cursor(cursor_path, offset)
@@ -197,6 +204,56 @@ async def telegram_notifier(log):
 
     finally:
         await bot.session.close()
+
+
+async def run_bot_commands(log):
+    """Run the interactive command dispatcher (admin commands) via long polling."""
+    if not BOT_TOKEN:
+        log.error("BOT_TOKEN is missing in .env — bot commands disabled")
+        return
+
+    if ADMIN_CHAT_ID == 0:
+        log.error("ADMIN_CHAT_ID is missing/invalid in .env — bot commands disabled")
+        return
+
+    session = AiohttpSession(proxy=TELEGRAM_PROXY)
+    bot = Bot(token=BOT_TOKEN, session=session)
+
+    try:
+        # Register command menu in Telegram
+        try:
+            await bot.set_my_commands([
+                BotCommand(command="status", description="Состояние парсера"),
+                BotCommand(command="stats",  description="Статистика по счётчикам"),
+                BotCommand(command="pause",  description="Приостановить парсинг"),
+                BotCommand(command="resume", description="Возобновить парсинг"),
+                BotCommand(command="last",   description="Последние 5 заказов"),
+                BotCommand(command="test",   description="Тестовое сообщение"),
+                BotCommand(command="help",   description="Список команд"),
+            ])
+        except Exception:
+            log.exception("Failed to set bot commands menu (non-fatal)")
+
+        dp = Dispatcher()
+        dp.include_router(commands_router)
+
+        log.info("Bot commands polling started. proxy=%s", TELEGRAM_PROXY)
+        await dp.start_polling(bot, skip_updates=True)
+
+    except asyncio.CancelledError:
+        log.info("Bot commands polling cancelled.")
+        raise
+
+    except Exception:
+        log.exception("Bot commands polling error")
+
+    finally:
+        try:
+            await dp.stop_polling()
+        except Exception:
+            pass
+        await bot.session.close()
+        log.info("Bot commands polling stopped.")
 
 
 async def supervise_parser(runlog):
@@ -254,8 +311,9 @@ async def async_main():
 
     supervise_task = asyncio.create_task(supervise_parser(runlog))
     bot_task = asyncio.create_task(telegram_notifier(setup_logger("bot")))
+    commands_task = asyncio.create_task(run_bot_commands(setup_logger("commands")))
 
-    tasks = [supervise_task, bot_task]
+    tasks = [supervise_task, bot_task, commands_task]
 
     try:
         await asyncio.gather(*tasks)

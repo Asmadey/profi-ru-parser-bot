@@ -1,0 +1,342 @@
+# Specialties configuration for the Profi.ru Parser Bot
+#
+# This file defines multiple specialties that the bot can match against
+# incoming orders. Each specialty is a set of filter rules:
+#
+#   name                 : Human-readable identifier (required)
+#   target_keywords      : List of regex strings — order must match at least one
+#   dev_keywords         : List of plain strings — order must contain at least one
+#   disallowed_topics    : List of plain strings — order is rejected if any found
+#   disallowed_platforms : List of regex strings — order is rejected if any found
+#   budget_min           : Minimum budget in rubles (default: 10000)
+#   chat_id              : Telegram chat ID for routing (null = default chat)
+#
+# If this file is missing or empty, the bot falls back to DEFAULT_SPECIALTY
+# (the original hardcoded patterns from filters.py).
+#
+# Copy this file to specialties.yaml and customise as needed.
+
+# ---------------------------------------------------------------------------
+# Specialty 1: AI/ML — same keywords as the original hardcoded default
+# ---------------------------------------------------------------------------
+- name: "AI/ML"
+  target_keywords:
+    # Bot / чат-бот
+    - "(?iu)\\bбот\\b"
+    - "(?iu)\\bбота\\b"
+    - "(?iu)\\bботы\\b"
+    - "(?iu)\\bботов\\b"
+    - "(?iu)\\bботом\\b"
+    - "(?iu)\\bботу\\b"
+    - "(?iu)\\bчат[- ]?бот\\b"
+    - "(?iu)\\bчат[- ]?бота\\b"
+    - "(?iu)\\bchat[- ]?bot\\b"
+    - "(?iu)\\bbot\\b"
+    - "(?iu)\\bbots\\b"
+    # CRM
+    - "(?iu)\\bcrm\\b"
+    - "(?iu)\\bcrm[- ]?систем\\w*\\b"
+    - "(?iu)\\bцрм\\b"
+    - "(?iu)\\bцрм[- ]?систем\\w*\\b"
+    - "(?iu)\\bсрм\\b"
+    - "(?iu)\\bсрм[- ]?систем\\w*\\b"
+    - "(?iu)\\bси[- ]?ар[- ]?эм\\b"
+    # Parser / парсинг
+    - "(?iu)\\bпарсер\\w*\\b"
+    - "(?iu)\\bпарсинг\\w*\\b"
+    - "(?iu)\\bпарсить\\b"
+    - "(?iu)\\bпарсить\\w*\\b"
+    - "(?iu)\\bспарс\\w*\\b"
+    - "(?iu)\\bраспарс\\w*\\b"
+    - "(?iu)\\bparser\\w*\\b"
+    - "(?iu)\\bparsing\\b"
+    - "(?iu)\\bparse\\b"
+    # Automation / автоматизация
+    - "(?iu)\\bавтоматизац\\w*\\b"
+    - "(?iu)\\bавтоматизир\\w*\\b"
+    - "(?iu)\\bавтоматическ\\w*\\b"
+    - "(?iu)\\bautomation\\b"
+    - "(?iu)\\bautomate\\b"
+    - "(?iu)\\bautomated\\b"
+  dev_keywords:
+    - разработка
+    - разработать
+    - разработчик
+    - создать
+    - создание
+    - сделать
+    - написать
+    - реализовать
+    - доработать
+    - настроить
+    - настройка
+    - внедрить
+    - внедрение
+    - интегрировать
+    - интеграция
+    - нужен
+    - нужна
+    - нужно
+    - нужны
+    - требуется
+    - требуются
+    - необходимо
+    - надо
+    - ищу
+    - заказать
+    - хочу
+  disallowed_topics:
+    - таргет
+    - таргетинг
+    - таргетированная реклама
+    - контекстная реклама
+    - директ
+    - smm
+    - смм
+    - продвижение
+    - рекламная кампания
+    - специалист по рекламе
+    - настройка рекламы
+    - ведение рекламы
+  disallowed_platforms:
+    - "(?iu)\\binstagram\\b"
+    - "(?iu)\\bинстаграм\\b"
+    - "(?iu)\\binsta\\b"
+    - "(?iu)\\bwhatsapp\\b"
+    - "(?iu)\\bватсап\\b"
+    - "(?iu)\\bfacebook\\b"
+    - "(?iu)\\bdiscord\\b"
+  budget_min: 10000
+  chat_id: null  # route to default chat
+
+# ---------------------------------------------------------------------------
+# Specialty 2: Web Development — React, Vue, Django, Flask, FastAPI, etc.
+# ---------------------------------------------------------------------------
+- name: "Web Development"
+  target_keywords:
+    # Frontend frameworks
+    - "(?iu)\\breact\\b"
+    - "(?iu)\\breactjs\\b"
+    - "(?iu)\\breact\\.js\\b"
+    - "(?iu)\\bnext\\.?js\\b"
+    - "(?iu)\\bvue\\.?js\\b"
+    - "(?iu)\\bvue\\b"
+    - "(?iu)\\bnuxt\\b"
+    - "(?iu)\\bangular\\b"
+    - "(?iu)\\bsvelte\\b"
+    - "(?iu)\\bsveltekit\\b"
+    # Frontend general
+    - "(?iu)\\bфронтенд\\b"
+    - "(?iu)\\bfrontend\\b"
+    - "(?iu)\\bfront[- ]?end\\b"
+    - "(?iu)\\bверстк\\w*\\b"
+    - "(?iu)\\bверстать\\b"
+    - "(?iu)\\bhtml\\b"
+    - "(?iu)\\bcss\\b"
+    - "(?iu)\\btailwind\\b"
+    - "(?iu)\\btypescript\\b"
+    - "(?iu)\\bjavascript\\b"
+    - "(?iu)\\bjs\\b"
+    - "(?iu)\\bts\\b"
+    # Backend frameworks
+    - "(?iu)\\bdjango\\b"
+    - "(?iu)\\bflask\\b"
+    - "(?iu)\\bfastapi\\b"
+    - "(?iu)\\bfast[- ]?api\\b"
+    - "(?iu)\\bstarlette\\b"
+    - "(?iu)\\baiohttp\\b"
+    - "(?iu)\\btornado\\b"
+    - "(?iu)\\bexpress\\b"
+    - "(?iu)\\bnestjs\\b"
+    - "(?iu)\\bnest\\.js\\b"
+    - "(?iu)\\bspring\\b"
+    - "(?iu)\\bspringboot\\b"
+    - "(?iu)\\bspring[- ]?boot\\b"
+    - "(?iu)\\bruby on rails\\b"
+    - "(?iu)\\brails\\b"
+    - "(?iu)\\blaravel\\b"
+    - "(?iu)\\bsymfony\\b"
+    - "(?iu)\\bcodeigniter\\b"
+    # Backend general
+    - "(?iu)\\bбэкенд\\b"
+    - "(?iu)\\bbackend\\b"
+    - "(?iu)\\bback[- ]?end\\b"
+    - "(?iu)\\bapi\\b"
+    - "(?iu)\\brest api\\b"
+    - "(?iu)\\brestful\\b"
+    - "(?iu)\\bgraphql\\b"
+    - "(?iu)\\b grpc \\b"
+    - "(?iu)\\bмикросервис\\w*\\b"
+    - "(?iu)\\bweb[- ]?приложени\\w*\\b"
+    - "(?iu)\\bвеб[- ]?приложени\\w*\\b"
+    - "(?iu)\\bсайт\\b"
+    - "(?iu)\\bпортал\\b"
+    - "(?iu)\\bлендинг\\b"
+    - "(?iu)\\bинтернет[- ]?магазин\\w*\\b"
+  dev_keywords:
+    - разработка
+    - разработать
+    - разработчик
+    - создать
+    - создание
+    - сделать
+    - написать
+    - реализовать
+    - доработать
+    - настроить
+    - настройка
+    - внедрить
+    - внедрение
+    - интегрировать
+    - интеграция
+    - нужен
+    - нужна
+    - нужно
+    - нужны
+    - требуется
+    - требуются
+    - необходимо
+    - надо
+    - ищу
+    - заказать
+    - хочу
+    - программист
+    - программирование
+    - код
+    - закодить
+  disallowed_topics:
+    - таргет
+    - таргетинг
+    - таргетированная реклама
+    - контекстная реклама
+    - директ
+    - smm
+    - смм
+    - продвижение
+    - рекламная кампания
+    - специалист по рекламе
+    - настройка рекламы
+    - ведение рекламы
+    - дизайн
+    - логотип
+    - иллюстрация
+    - баннер
+  disallowed_platforms:
+    - "(?iu)\\binstagram\\b"
+    - "(?iu)\\bинстаграм\\b"
+    - "(?iu)\\binsta\\b"
+    - "(?iu)\\bwhatsapp\\b"
+    - "(?iu)\\bватсап\\b"
+    - "(?iu)\\bfacebook\\b"
+    - "(?iu)\\bdiscord\\b"
+  budget_min: 15000
+  chat_id: null  # set to a real chat ID, e.g. -1001234567890
+
+# ---------------------------------------------------------------------------
+# Specialty 3: Data Science — pandas, numpy, matplotlib, data analysis, ML
+# ---------------------------------------------------------------------------
+- name: "Data Science"
+  target_keywords:
+    # Python data-science stack
+    - "(?iu)\\bpandas\\b"
+    - "(?iu)\\bnumpy\\b"
+    - "(?iu)\\bscipy\\b"
+    - "(?iu)\\bmatplotlib\\b"
+    - "(?iu)\\bseaborn\\b"
+    - "(?iu)\\bplotly\\b"
+    - "(?iu)\\bbokeh\\b"
+    - "(?iu)\\bscikit[- ]?learn\\b"
+    - "(?iu)\\bsklearn\\b"
+    - "(?iu)\\btensorflow\\b"
+    - "(?iu)\\bpytorch\\b"
+    - "(?iu)\\bkeras\\b"
+    - "(?iu)\\bxgboost\\b"
+    - "(?iu)\\blightgbm\\b"
+    - "(?iu)\\bcatboost\\b"
+    - "(?iu)\\bjupyter\\b"
+    - "(?iu)\\bnotebook\\b"
+    # Data analysis / ML terms (Russian + English)
+    - "(?iu)\\bdata science\\b"
+    - "(?iu)\\bdata analysis\\b"
+    - "(?iu)\\bdata analyst\\b"
+    - "(?iu)\\bmachine learning\\b"
+    - "(?iu)\\bml\\b"
+    - "(?iu)\\bdeep learning\\b"
+    - "(?iu)\\bнейронн\\w*\\b"
+    - "(?iu)\\bнейросет\\w*\\b"
+    - "(?iu)\\bмашинн\\w* обучени\\w*\\b"
+    - "(?iu)\\bискусственн\\w* интелл\\w*\\b"
+    - "(?iu)\\bии\\b"
+    - "(?iu)\\bанализ данных\\b"
+    - "(?iu)\\bобработк\\w* данных\\b"
+    - "(?iu)\\bвизуализац\\w* данных\\b"
+    - "(?iu)\\bдатасаент\\w*\\b"
+    - "(?iu)\\bдатасаенс\\b"
+    - "(?iu)\\bдата[- ]?сайентист\\b"
+    - "(?iu)\\bdata scientist\\b"
+    - "(?iu)\\bnlp\\b"
+    - "(?iu)\\bcomputer vision\\b"
+    - "(?iu)\\bкомпьютерн\\w* зрени\\w*\\b"
+    - "(?iu)\\bпредиктивн\\w*\\b"
+    - "(?iu)\\bpredicti\\w*\\b"
+    - "(?iu)\\bкластеризац\\w*\\b"
+    - "(?iu)\\bклассификац\\w*\\b"
+    - "(?iu)\\bрегресси\\w*\\b"
+    - "(?iu)\\bрекомендател\\w* систем\\w*\\b"
+  dev_keywords:
+    - разработка
+    - разработать
+    - разработчик
+    - создать
+    - создание
+    - сделать
+    - написать
+    - реализовать
+    - доработать
+    - настроить
+    - настройка
+    - внедрить
+    - внедрение
+    - интегрировать
+    - интеграция
+    - нужен
+    - нужна
+    - нужно
+    - нужны
+    - требуется
+    - требуются
+    - необходимо
+    - надо
+    - ищу
+    - заказать
+    - хочу
+    - посчитать
+    - проанализировать
+    - исследование
+    - обучить
+    - обучение
+    - спрогнозировать
+    - прогноз
+  disallowed_topics:
+    - таргет
+    - таргетинг
+    - таргетированная реклама
+    - контекстная реклама
+    - директ
+    - smm
+    - смм
+    - продвижение
+    - рекламная кампания
+    - специалист по рекламе
+    - настройка рекламы
+    - ведение рекламы
+  disallowed_platforms:
+    - "(?iu)\\binstagram\\b"
+    - "(?iu)\\bинстаграм\\b"
+    - "(?iu)\\binsta\\b"
+    - "(?iu)\\bwhatsapp\\b"
+    - "(?iu)\\bватсап\\b"
+    - "(?iu)\\bfacebook\\b"
+    - "(?iu)\\bdiscord\\b"
+  budget_min: 20000
+  chat_id: null  # set to a real chat ID, e.g. -1001234567890

@@ -10,7 +10,9 @@ from auth import ensure_auth_state
 from client import ProfiClient
 from parser import parse_order_snippet
 from storage import load_seen_ids, save_seen_ids, append_jsonl
-from filters import order_matches_filter
+from specialties import load_specialties, Specialty, DEFAULT_SPECIALTY
+from filters import match_specialties
+from enricher import enrich_orders_batch
 
 
 logger = logging.getLogger("parser")
@@ -73,10 +75,24 @@ def _restart_client(client: ProfiClient | None, p, s: Settings, reason: str, bac
 def main():
     s = Settings()
 
+    # --- Multi-specialty loading ---
+    specialties = load_specialties(s.specialties_path)
+    specialty_names = [sp.name for sp in specialties]
+    if len(specialties) == 1 and specialties[0] is DEFAULT_SPECIALTY:
+        logger.info(
+            "No specialties YAML found at %s — using DEFAULT_SPECIALTY (%s).",
+            s.specialties_path, specialty_names[0],
+        )
+    else:
+        logger.info(
+            "Loaded %d specialties from %s: %s",
+            len(specialties), s.specialties_path, specialty_names,
+        )
+
     with sync_playwright() as p:
         # Proactive auth refresh: re-auth if state file is stale
         if _is_auth_state_stale(s):
-            logger.info("storage_state.json is stale (>\u003e%dh). Proactive re-auth.", AUTH_REFRESH_HOURS)
+            logger.info("storage_state.json is stale (>%dh). Proactive re-auth.", AUTH_REFRESH_HOURS)
             ensure_auth_state(p, s)
 
         ensure_auth_state(p, s)
@@ -102,6 +118,12 @@ def main():
                 logger.warning("No cards on first load. Will keep trying...")
 
             while True:
+                # --- Pause check (flag-file based, no circular import) ---
+                if os.path.exists("pause.flag"):
+                    logger.info("Paused (pause.flag exists), skipping cycle.")
+                    sleep_human(poll_base, poll_jitter)
+                    continue
+
                 try:
                     client.soft_refresh()
                     net_errors = 0
@@ -207,31 +229,55 @@ def main():
                     if oid in seen_ids:
                         continue
 
-                    match = order_matches_filter(data)
+                    matched_specialties = match_specialties(data, specialties)
 
                     if DEBUG_FILTER:
                         t = data.get("title", "")
                         d = data.get("description", "")
                         text = f"{t} {d}".lower()
                         logger.info(
-                            "FILTER oid=%s match=%s | title=%r | desc_len=%d | text_has_бот=%s",
-                            oid, match, t, len(d), ("бот" in text),
+                            "FILTER oid=%s matched=%s | title=%r | desc_len=%d | text_has_бот=%s",
+                            oid, [sp.name for sp in matched_specialties], t, len(d), ("бот" in text),
                         )
 
-                    if not match:
+                    if not matched_specialties:
                         continue
+
+                    data["matched_specialties"] = [sp.name for sp in matched_specialties]
+                    logger.info(
+                        "Order %s matched specialties: %s",
+                        oid, data["matched_specialties"],
+                    )
 
                     seen_ids.add(oid)
                     new_orders.append(data)
 
                 if new_orders:
-                    for order in new_orders:
+                    # --- Enrich orders via detail-page navigation ---
+                    try:
+                        enriched_orders = enrich_orders_batch(
+                            client.context,
+                            new_orders,
+                            delay_sec=3,
+                            max_enrich=5,
+                        )
+                    except Exception:
+                        logger.exception("Enrichment failed; falling back to unenriched orders.")
+                        enriched_orders = [{**o, "enriched": False} for o in new_orders]
+
+                    enriched_count = sum(1 for o in enriched_orders if o.get("enriched"))
+                    logger.info(
+                        "Enrichment: %d/%d orders enriched.",
+                        enriched_count, len(enriched_orders),
+                    )
+
+                    for order in enriched_orders:
                         append_jsonl(s.out_jsonl_path, order)
 
                     save_seen_ids(s.seen_ids_path, seen_ids)
                     logger.info(
                         "Saved %d new orders. seen_ids=%d",
-                        len(new_orders), len(seen_ids),
+                        len(enriched_orders), len(seen_ids),
                     )
 
                 # Reset backoff on successful cycle
