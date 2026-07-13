@@ -4,7 +4,7 @@ bot_cursor_path: str = "bot_cursor.json"
 
 @dataclass(frozen=True)
 class Settings:
-    page_url: str = "https://profi.ru/backoffice/"
+    page_url: str = "https://profi.ru/backoffice/n.php"
     state_path: str = "storage_state.json"
     auth_state_path: str = "storage_state.json"
     out_jsonl_path: str = "new_orders.jsonl"
