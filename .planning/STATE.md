@@ -1,12 +1,13 @@
 # Current State
 
 **Last reviewed:** 2026-07-13
+**Phase 1 (Stabilization): COMPLETE** — commit `a278c0c`
 
 ---
 
-## Status: MVP — Functional with Known Bugs
+## Status: MVP — Stabilized
 
-The core pipeline (parse → filter → notify) is operational via `run_all.py`. The project can run end-to-end given proper setup (external Chrome CDP + `.env` credentials). However, there are bugs in alternative entry points and missing operational infrastructure.
+The core pipeline (parse → filter → notify) is operational via `run_all.py`. Phase 1 stabilization complete: dead code removed, bugs fixed, startup validation added.
 
 ---
 
@@ -58,51 +59,57 @@ The core pipeline (parse → filter → notify) is operational via `run_all.py`.
    - JSON payload logging helper
    - Console + file output
 
+8. **Startup validation (`run_all.py`)** — ✅ NEW (Phase 1)
+   - Chrome CDP reachability check before starting
+   - Clear error message if Chrome is not running on port 9225
+   - Exits with code 1 if CDP unavailable
+
+9. **Environment documentation (`.env.example`)** — ✅ NEW (Phase 1)
+   - Documents BOT_TOKEN, ADMIN_CHAT_ID, TELEGRAM_PROXY
+
 ---
 
-## What's Broken / Buggy ❌
+## Phase 1 Fixes ✅
 
-1. **`tg_bot.py`** — Multiple bugs, likely dead code:
-   - `text = order_matches_filter(order)` — assigns `bool` to `text`, then passes to `bot.send_message()` as message body. Should use `format_order(order)` instead.
-   - `orders, _ = orders, _ = read_new_orders()` — nonsensical double assignment (no-op, but confusing).
-   - `from asyncio.log import logger` — imports stdlib's logger, not the configured `setup_logger`. The `log` variable from `setup_logger("bot")` is used for some calls, but `logger` (stdlib) is used for others — inconsistent.
-   - This file appears to be an older alternative to `run_all.py`'s notifier and is NOT the primary entry point.
-
-2. **`tg_formatter.py`** — Minor issue:
-   - `from html import escape as h` on line 3 is immediately shadowed by `def h(x):` on line 5. The import is unused/dead code.
-
-3. **README vs Reality mismatch:**
-   - README says configure `KEYWORDS = []` in `config.py`, but actual filtering is hardcoded in `filters.py` with regex patterns. The `config.py` `Settings` dataclass has no `KEYWORDS` field.
-   - README doesn't mention the external Chrome CDP requirement (port 9225) — a critical setup step.
-   - README says `python run_all.py` but doesn't document the prerequisites (Chrome with `--remote-debugging-port=9225`, `.env` file).
+- ~~`tg_bot.py` — Multiple bugs, dead code~~ → **DELETED**
+- ~~`tg_watcher.py` — Only used by broken tg_bot.py~~ → **DELETED**
+- ~~`tg_formatter.py` — Unused import shadowing~~ → **FIXED** (removed `from html import escape as h`)
+- ~~No `.env.example`~~ → **CREATED**
+- ~~No startup validation for Chrome CDP~~ → **ADDED** in `run_all.py`
 
 ---
 
 ## What's Missing / Not Implemented 🚧
 
-1. **No `.env.example`** — Users must guess env var names (`BOT_TOKEN`, `ADMIN_CHAT_ID`, `TELEGRAM_PROXY`).
-2. **No tests** — Zero test files in the repository.
-3. **No CI/CD** — No GitHub Actions, no linting config.
-4. **No Docker** — No Dockerfile or docker-compose.
-5. **No `pyproject.toml`** — Only `requirements.txt` with pinned versions.
-6. **No `.env` file present** — (gitignored, expected).
-7. **No health monitoring** — No way to check if bot is alive externally.
-8. **No alerting** — Critical failures (auth, Chrome down, too many restarts) are logged but not sent to admin via Telegram.
-9. **No data retention** — `logs/debug/` and `new_orders.jsonl` grow indefinitely.
-10. **No interactive bot commands** — No `/status`, `/pause`, `/stats` commands.
-11. **No multi-chat/multi-specialty** — Single filter set, single target chat.
+1. **No tests** — Zero test files in the repository.
+2. **No CI/CD** — No GitHub Actions, no linting config.
+3. **No Docker** — No Dockerfile or docker-compose.
+4. **No `pyproject.toml`** — Only `requirements.txt` with pinned versions.
+5. **No health monitoring** — No way to check if bot is alive externally.
+6. **No alerting** — Critical failures logged but not sent to admin via Telegram.
+7. **No data retention** — `logs/debug/` and `new_orders.jsonl` grow indefinitely.
+8. **No interactive bot commands** — No `/status`, `/pause`, `/stats` commands.
+9. **No multi-chat/multi-specialty** — Single filter set, single target chat.
+10. **README outdated** — Doesn't document Chrome CDP requirement.
 
 ---
 
-## What's Next  *(Priority Order)*
+## What's Next *(Priority Order)*
 
-1. **Fix or remove `tg_bot.py`** — Dead code with bugs creates confusion
-2. **Fix `tg_formatter.py` import** — Trivial cleanup
-3. **Add `.env.example`** — Critical for onboarding
-4. **Update README** — Document Chrome CDP requirement and actual config structure
-5. **Add startup validation** — Fail fast if Chrome CDP unreachable
-6. **Add Docker setup** — For reproducible deployment
-7. **Add tests for `filters.py`** — Most complex logic, highest risk of regression
+### Phase 2: Configuration & Deployment (M2)
+1. Update README — document Chrome CDP requirement and actual config structure
+2. Move hardcoded settings in `filters.py` to `config.py`
+3. Add `Dockerfile` + `docker-compose.yml`
+4. Add `pyproject.toml`
+5. Add health check endpoint
+6. Add systemd unit file
+
+### Phase 3: Robustness & Observability (M3)
+1. Structured JSON logging
+2. Metrics collection
+3. Alerting via Telegram
+4. Proactive session refresh
+5. Data retention cleanup
 
 ---
 
@@ -110,18 +117,19 @@ The core pipeline (parse → filter → notify) is operational via `run_all.py`.
 
 | File | Status | Notes |
 |---|---|---|
-| `run_all.py` | ✅ Working | Primary entry point |
+| `run_all.py` | ✅ Working | Primary entry point. CDP validation added (Phase 1) |
 | `main.py` | ✅ Working | Parser loop |
 | `client.py` | ✅ Working | Playwright CDP client |
 | `auth.py` | ✅ Working | First-run auth |
 | `parser.py` | ✅ Working | DOM extraction |
 | `filters.py` | ✅ Working | Multi-stage filtering |
 | `storage.py` | ✅ Working | Seen IDs + JSONL |
-| `tg_formatter.py` | ⚠️ Minor bug | Unused import shadowing |
+| `tg_formatter.py` | ✅ Fixed | Unused import removed (Phase 1) |
 | `logger_setup.py` | ✅ Working | Rotating logger |
-| `tg_bot.py` | ❌ Broken | Multiple bugs, likely dead code |
-| `tg_watcher.py` | ⚠️ Unused | Only used by broken `tg_bot.py` |
 | `config.py` | ✅ Working | Settings dataclass |
+| `.env.example` | ✅ New | Created in Phase 1 |
+| `tg_bot.py` | ❌ Deleted | Removed in Phase 1 |
+| `tg_watcher.py` | ❌ Deleted | Removed in Phase 1 |
+| `README.md` | ⚠️ Outdated | Mismatches actual implementation |
 | `requirements.txt` | ✅ Present | Pinned dependencies |
 | `.gitignore` | ✅ Present | Covers runtime artifacts |
-| `README.md` | ⚠️ Outdated | Mismatches actual implementation |
