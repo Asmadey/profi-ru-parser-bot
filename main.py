@@ -1,6 +1,7 @@
 import random
 import time
 import logging
+import os
 
 from playwright.sync_api import sync_playwright
 
@@ -15,6 +16,7 @@ from filters import order_matches_filter
 logger = logging.getLogger("parser")
 
 DEBUG_FILTER = False
+AUTH_REFRESH_HOURS = 24  # proactive re-auth interval
 
 
 def sleep_human(base: int, jitter: int):
@@ -25,6 +27,14 @@ def _get_poll_params(s: Settings):
     base = getattr(s, "poll_base_sec", getattr(s, "poll_base", 45))
     jitter = getattr(s, "poll_jitter_sec", getattr(s, "poll_jitter", 25))
     return int(base), int(jitter)
+
+
+def _is_auth_state_stale(s: Settings) -> bool:
+    """Check if storage_state.json is older than AUTH_REFRESH_HOURS."""
+    if not os.path.exists(s.auth_state_path):
+        return True
+    age_sec = time.time() - os.path.getmtime(s.auth_state_path)
+    return age_sec > AUTH_REFRESH_HOURS * 3600
 
 
 def _start_client(p, s: Settings) -> ProfiClient:
@@ -39,8 +49,8 @@ def _start_client(p, s: Settings) -> ProfiClient:
     return client
 
 
-def _restart_client(client: ProfiClient | None, p, s: Settings, reason: str) -> ProfiClient:
-    logger.warning("Restarting Playwright client. reason=%s", reason)
+def _restart_client(client: ProfiClient | None, p, s: Settings, reason: str, backoff_errors: int = 0) -> ProfiClient:
+    logger.warning("Restarting Playwright client. reason=%s backoff_errors=%d", reason, backoff_errors)
 
     if client is not None:
         try:
@@ -48,7 +58,10 @@ def _restart_client(client: ProfiClient | None, p, s: Settings, reason: str) -> 
         except Exception:
             logger.exception("Failed to close client during restart")
 
-    time.sleep(5)
+    # Exponential backoff: base 5s, double each error, cap at backoff_max_sec
+    delay = min(5 * (2 ** backoff_errors), getattr(s, "backoff_max_sec", 900))
+    logger.info("Backoff delay: %ss", delay)
+    time.sleep(delay)
     new_client = _start_client(p, s)
 
     if not new_client.wait_cards():
@@ -61,6 +74,11 @@ def main():
     s = Settings()
 
     with sync_playwright() as p:
+        # Proactive auth refresh: re-auth if state file is stale
+        if _is_auth_state_stale(s):
+            logger.info("storage_state.json is stale (>\u003e%dh). Proactive re-auth.", AUTH_REFRESH_HOURS)
+            ensure_auth_state(p, s)
+
         ensure_auth_state(p, s)
 
         seen_ids = load_seen_ids(s.seen_ids_path)
@@ -75,6 +93,7 @@ def main():
 
         client: ProfiClient | None = None
         net_errors = 0
+        backoff_errors = 0
 
         try:
             client = _start_client(p, s)
@@ -90,7 +109,8 @@ def main():
                 except RuntimeError as e:
                     if str(e) == "PAGE_OR_BROWSER_CRASHED":
                         logger.exception("Browser/page crashed during refresh")
-                        client = _restart_client(client, p, s, "page crashed on refresh")
+                        backoff_errors += 1
+                        client = _restart_client(client, p, s, "page crashed on refresh", backoff_errors)
                         continue
                     raise
 
@@ -102,14 +122,16 @@ def main():
                         logger.warning("Network/DNS error #%d: %s", net_errors, e)
 
                         if net_errors >= 3:
-                            client = _restart_client(client, p, s, "too many network errors")
+                            backoff_errors += 1
+                            client = _restart_client(client, p, s, "too many network errors", backoff_errors)
                             net_errors = 0
 
                         time.sleep(20)
                         continue
 
                     logger.exception("Unexpected error in main loop (refresh). Restarting client.")
-                    client = _restart_client(client, p, s, "unexpected refresh error")
+                    backoff_errors += 1
+                    client = _restart_client(client, p, s, "unexpected refresh error", backoff_errors)
                     continue
 
                 try:
@@ -117,7 +139,8 @@ def main():
                 except RuntimeError as e:
                     if str(e) == "PAGE_OR_BROWSER_CRASHED":
                         logger.exception("Browser/page crashed while waiting cards")
-                        client = _restart_client(client, p, s, "page crashed while waiting cards")
+                        backoff_errors += 1
+                        client = _restart_client(client, p, s, "page crashed while waiting cards", backoff_errors)
                         continue
                     raise
 
@@ -131,7 +154,8 @@ def main():
                             title, url,
                         )
                         ensure_auth_state(p, s)
-                        client = _restart_client(client, p, s, "re-auth after logout")
+                        backoff_errors += 1
+                        client = _restart_client(client, p, s, "re-auth after logout", backoff_errors)
                         sleep_human(5, 5)
                         continue
 
@@ -145,12 +169,14 @@ def main():
                     except RuntimeError as e:
                         if str(e) == "PAGE_OR_BROWSER_CRASHED":
                             logger.exception("Browser/page crashed while reopening board")
-                            client = _restart_client(client, p, s, "page crashed while reopening board")
+                            backoff_errors += 1
+                            client = _restart_client(client, p, s, "page crashed while reopening board", backoff_errors)
                             continue
                         raise
                     except Exception:
                         logger.exception("Failed to reopen board. Restarting client.")
-                        client = _restart_client(client, p, s, "failed open_board after no cards")
+                        backoff_errors += 1
+                        client = _restart_client(client, p, s, "failed open_board after no cards", backoff_errors)
                         continue
 
                     sleep_human(10, 10)
@@ -161,7 +187,8 @@ def main():
                     card_count = cards.count()
                 except Exception:
                     logger.exception("Failed to access cards locator. Restarting client.")
-                    client = _restart_client(client, p, s, "cards locator failed")
+                    backoff_errors += 1
+                    client = _restart_client(client, p, s, "cards locator failed", backoff_errors)
                     continue
 
                 new_orders = []
@@ -207,6 +234,8 @@ def main():
                         len(new_orders), len(seen_ids),
                     )
 
+                # Reset backoff on successful cycle
+                backoff_errors = 0
                 sleep_human(poll_base, poll_jitter)
 
         except KeyboardInterrupt:
