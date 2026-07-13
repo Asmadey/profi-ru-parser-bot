@@ -2,12 +2,15 @@
 
 **Last reviewed:** 2026-07-13
 **Phase 1 (Stabilization): COMPLETE** — commit `a278c0c`
+**Phase 2 (Configuration & Deployment): COMPLETE** — commit `043fbb1`
+**Phase 3 (Robustness & Observability): COMPLETE** — commit `d54efb9`
+**Phase 4 (Feature Enhancements): COMPLETE** — commit `4aaf626`
 
 ---
 
-## Status: MVP — Stabilized
+## Status: Production-Ready Feature Bot
 
-The core pipeline (parse → filter → notify) is operational via `run_all.py`. Phase 1 stabilization complete: dead code removed, bugs fixed, startup validation added.
+The core pipeline (parse → filter → enrich → notify) is operational with multi-specialty support, interactive Telegram commands, and order detail enrichment.
 
 ---
 
@@ -20,62 +23,82 @@ The core pipeline (parse → filter → notify) is operational via `run_all.py`.
    - Deduplicates via `seen_ids.json` (`storage.py`)
    - Appends to `new_orders.jsonl`
    - Human-like polling delays (45±25s)
+   - Multi-specialty filtering via `match_specialties()` (Phase 4)
+   - Order detail enrichment via `enricher.py` (Phase 4)
+   - Pause flag check (Phase 4)
 
 2. **Authentication (`auth.py`)** — Functional
    - First-run interactive login (non-headless browser)
    - Saves `storage_state.json` for session persistence
-   - Skips re-auth if state file exists
+   - Proactive re-auth if state > 24h old (Phase 3)
 
-3. **Order filtering (`filters.py`)** — Comprehensive and functional
-   - 35+ regex patterns for AI/ML/chatbot keywords (Russian + English)
-   - Development intent keywords
-   - Disallowed topics (marketing/ads) exclusion
-   - Disallowed platforms (Instagram, WhatsApp, etc.) exclusion
-   - Budget extraction with ≥10,000₽ threshold
-   - Text normalization (case-insensitive, ё→е, Unicode space handling)
+3. **Order filtering (`filters.py` + `specialties.py`)** — Multi-specialty (Phase 4)
+   - `Specialty` dataclass with configurable keyword sets
+   - `load_specialties()` from YAML file
+   - `match_specialties()` — order can match multiple specialties
+   - `DEFAULT_SPECIALTY` backwards-compatible with original patterns
+   - `specialties.yaml.example`: AI/ML, Web Dev, Data Science presets
+   - Budget threshold per specialty
 
-4. **Telegram notifier (`run_all.py::telegram_notifier`)** — Functional
-   - Cursor-based JSONL tail reading (`bot_cursor.json`)
-   - HTML message formatting (`tg_formatter.py`)
+4. **Order enrichment (`enricher.py`)** — ✅ NEW (Phase 4)
+   - Opens order detail pages in same browser context
+   - Extracts: full_description, client_rating, responses_count, attachments_count, category_path
+   - Rate-limited (3s delay, max 5 per cycle)
+   - Defensive: returns original order on any failure
+
+5. **Interactive Telegram commands (`bot_commands.py`)** — ✅ NEW (Phase 4)
+   - `/status` — parser heartbeat, uptime, last poll, pause status
+   - `/stats` — metrics counters with emojis
+   - `/pause` — create pause.flag, stop processing
+   - `/resume` — remove pause.flag, resume processing
+   - `/last` — last 5 matched orders
+   - `/test` — test formatted message
+   - `/help` — command list
+   - Admin-only (ADMIN_CHAT_ID guard)
+   - Commands registered with Telegram Bot API on startup
+
+6. **Telegram notifier (`run_all.py::telegram_notifier`)** — Functional + pause-aware (Phase 4)
+   - Cursor-based JSONL tail reading
+   - HTML message formatting
    - SOCKS5 proxy support
-   - Flood control handling (`TelegramRetryAfter`)
-   - First-start cursor initialization to end-of-file
+   - Flood control handling
+   - Pause-aware: skips sending when paused, cursor still advances
 
-5. **Orchestrator (`run_all.py`)** — Functional
-   - Concurrent parser subprocess + Telegram notifier
-   - Subprocess supervision with auto-restart (up to 50 times)
-   - stdout/stderr piping to logger
-   - Graceful shutdown (SIGINT → cancel tasks → terminate subprocess → kill if needed)
+7. **Orchestrator (`run_all.py`)** — Functional + 3 tasks (Phase 4)
+   - Concurrent: parser subprocess + telegram notifier + bot commands dispatcher
+   - Subprocess supervision with auto-restart
+   - Graceful shutdown
 
-6. **Resilience (`main.py`)** — Functional
-   - Network error handling (DNS, disconnect) with 3-strike restart
+8. **Resilience (`main.py`)** — Functional + exponential backoff (Phase 3)
+   - Network error handling with 3-strike restart
    - Browser crash detection and recovery
-   - Session expiry detection (title-based "вход"/"login" check) → re-auth
-   - Debug diagnostics (screenshots + HTML dumps on card-not-found)
+   - Session expiry detection → re-auth
+   - Exponential backoff (5s × 2^n, cap 900s)
 
-7. **Logging (`logger_setup.py`)** — Functional
-   - Rotating file handlers (2MB, 5 backups)
-   - Separate error log file
-   - JSON payload logging helper
-   - Console + file output
+9. **Logging (`logger_setup.py`)** — Functional + JSON format (Phase 3)
+   - Rotating file handlers
+   - JSON format option via `LOG_FORMAT=json`
 
-8. **Startup validation (`run_all.py`)** — ✅ NEW (Phase 1)
-   - Chrome CDP reachability check before starting
-   - Clear error message if Chrome is not running on port 9225
-   - Exits with code 1 if CDP unavailable
+10. **Metrics (`metrics.py`)** — ✅ NEW (Phase 3)
+    - Counters: parsed, matched, sent, errors, restarts, uptime
+    - JSON persistence (`metrics.json`)
 
-9. **Environment documentation (`.env.example`)** — ✅ NEW (Phase 1)
-   - Documents BOT_TOKEN, ADMIN_CHAT_ID, TELEGRAM_PROXY
+11. **Alerting (`alerting.py`)** — ✅ NEW (Phase 3)
+    - Telegram alerts on critical errors
 
----
+12. **Data retention (`cleanup.py`)** — ✅ NEW (Phase 3)
+    - Old screenshot cleanup (7 days)
+    - JSONL trimming (10k lines)
 
-## Phase 1 Fixes ✅
+13. **Storage robustness (`storage.py`)** — ✅ Enhanced (Phase 3)
+    - Graceful recovery on corrupted seen_ids.json
 
-- ~~`tg_bot.py` — Multiple bugs, dead code~~ → **DELETED**
-- ~~`tg_watcher.py` — Only used by broken tg_bot.py~~ → **DELETED**
-- ~~`tg_formatter.py` — Unused import shadowing~~ → **FIXED** (removed `from html import escape as h`)
-- ~~No `.env.example`~~ → **CREATED**
-- ~~No startup validation for Chrome CDP~~ → **ADDED** in `run_all.py`
+14. **Deployment** — ✅ Complete (Phase 2)
+    - `Dockerfile` + `docker-compose.yml`
+    - `pyproject.toml`
+    - systemd unit file
+    - `.env.example`
+    - README fully rewritten
 
 ---
 
@@ -83,33 +106,21 @@ The core pipeline (parse → filter → notify) is operational via `run_all.py`.
 
 1. **No tests** — Zero test files in the repository.
 2. **No CI/CD** — No GitHub Actions, no linting config.
-3. **No Docker** — No Dockerfile or docker-compose.
-4. **No `pyproject.toml`** — Only `requirements.txt` with pinned versions.
-5. **No health monitoring** — No way to check if bot is alive externally.
-6. **No alerting** — Critical failures logged but not sent to admin via Telegram.
-7. **No data retention** — `logs/debug/` and `new_orders.jsonl` grow indefinitely.
-8. **No interactive bot commands** — No `/status`, `/pause`, `/stats` commands.
-9. **No multi-chat/multi-specialty** — Single filter set, single target chat.
-10. **README outdated** — Doesn't document Chrome CDP requirement.
+3. **No web dashboard** — No web UI for monitoring.
+4. **No database backend** — Still using JSON/JSONL files.
+5. **No multi-account support** — Single Profi.ru account.
+6. **No auto-response** — No automatic responses to orders.
 
 ---
 
-## What's Next *(Priority Order)*
+## What's Next
 
-### Phase 2: Configuration & Deployment (M2)
-1. Update README — document Chrome CDP requirement and actual config structure
-2. Move hardcoded settings in `filters.py` to `config.py`
-3. Add `Dockerfile` + `docker-compose.yml`
-4. Add `pyproject.toml`
-5. Add health check endpoint
-6. Add systemd unit file
-
-### Phase 3: Robustness & Observability (M3)
-1. Structured JSON logging
-2. Metrics collection
-3. Alerting via Telegram
-4. Proactive session refresh
-5. Data retention cleanup
+### Phase 5: Testing & CI (M5)
+1. Unit tests for `filters.py`, `parser.py`, `storage.py`, `tg_formatter.py`
+2. Unit tests for `specialties.py`, `enricher.py`, `bot_commands.py`
+3. Integration tests for `run_all.py`
+4. GitHub Actions CI pipeline (lint + test)
+5. Type checking (mypy)
 
 ---
 
@@ -117,19 +128,28 @@ The core pipeline (parse → filter → notify) is operational via `run_all.py`.
 
 | File | Status | Notes |
 |---|---|---|
-| `run_all.py` | ✅ Working | Primary entry point. CDP validation added (Phase 1) |
-| `main.py` | ✅ Working | Parser loop |
+| `run_all.py` | ✅ Working | 3 async tasks: parser + notifier + commands |
+| `main.py` | ✅ Working | Multi-specialty + enrichment + pause |
 | `client.py` | ✅ Working | Playwright CDP client |
-| `auth.py` | ✅ Working | First-run auth |
+| `auth.py` | ✅ Working | First-run auth + proactive refresh |
 | `parser.py` | ✅ Working | DOM extraction |
-| `filters.py` | ✅ Working | Multi-stage filtering |
-| `storage.py` | ✅ Working | Seen IDs + JSONL |
-| `tg_formatter.py` | ✅ Fixed | Unused import removed (Phase 1) |
-| `logger_setup.py` | ✅ Working | Rotating logger |
-| `config.py` | ✅ Working | Settings dataclass |
-| `.env.example` | ✅ New | Created in Phase 1 |
-| `tg_bot.py` | ❌ Deleted | Removed in Phase 1 |
-| `tg_watcher.py` | ❌ Deleted | Removed in Phase 1 |
-| `README.md` | ⚠️ Outdated | Mismatches actual implementation |
+| `filters.py` | ✅ Enhanced | Multi-specialty filtering (Phase 4) |
+| `specialties.py` | ✅ New | Specialty dataclass + YAML loader (Phase 4) |
+| `specialties.yaml.example` | ✅ New | 3 example specialties (Phase 4) |
+| `enricher.py` | ✅ New | Order detail enrichment (Phase 4) |
+| `bot_commands.py` | ✅ New | Interactive Telegram commands (Phase 4) |
+| `storage.py` | ✅ Enhanced | Corruption recovery (Phase 3) |
+| `tg_formatter.py` | ✅ Working | HTML formatting |
+| `logger_setup.py` | ✅ Working | Rotating logger + JSON option |
+| `metrics.py` | ✅ New | In-memory metrics (Phase 3) |
+| `alerting.py` | ✅ New | Telegram alerts (Phase 3) |
+| `cleanup.py` | ✅ New | Data retention (Phase 3) |
+| `config.py` | ✅ Enhanced | Settings with specialties_path |
+| `.env.example` | ✅ Present | Environment docs |
+| `README.md` | ✅ Rewritten | Full docs (Phase 2) |
+| `Dockerfile` | ✅ New | Container deployment (Phase 2) |
+| `docker-compose.yml` | ✅ New | Container orchestration (Phase 2) |
+| `pyproject.toml` | ✅ New | Python packaging (Phase 2) |
+| `systemd/profi-parser-bot.service` | ✅ New | Systemd unit (Phase 2) |
 | `requirements.txt` | ✅ Present | Pinned dependencies |
 | `.gitignore` | ✅ Present | Covers runtime artifacts |
